@@ -231,10 +231,7 @@ struct full_conn
     unsigned                     fc_orig_versions;      /* Client only */
     enum enc_level               fc_crypto_enc_level;
     struct ack_info              fc_ack;
-    struct {
-        unsigned init_time;
-        unsigned send_period;
-    } fc_cctk;
+    struct cctk_ctx             *fc_cctk;
 };
 
 static const struct ver_neg server_ver_neg;
@@ -558,8 +555,8 @@ apply_peer_settings (struct full_conn *conn)
 
     if (ccre)
         conn->fc_flags |= FC_CCTK;
-    conn->fc_cctk.init_time = itct;
-    conn->fc_cctk.send_period = spct;
+    conn->fc_cctk->init_time = itct;
+    conn->fc_cctk->send_period = spct;
 
     return 0;
 }
@@ -721,6 +718,7 @@ new_conn_common (lsquic_cid_t cid, struct lsquic_engine_public *enpub,
     conn->fc_conn.cn_n_cces = sizeof(conn->fc_cces) / sizeof(conn->fc_cces[0]);
     if (conn->fc_settings->es_noprogress_timeout)
         conn->fc_flags |= FC_NOPROG_TIMEOUT;
+    conn->fc_cctk = calloc(1, sizeof(struct cctk_ctx));
     return conn;
 
   cleanup_on_error:
@@ -1157,6 +1155,8 @@ full_conn_ci_destroy (lsquic_conn_t *lconn)
         STAILQ_REMOVE_HEAD(&conn->fc_stream_ids_to_reset, sitr_next);
         free(sitr);
     }
+    if (conn->fc_cctk)
+        free(conn->fc_cctk);
     EV_LOG_CONN_EVENT(LSQUIC_LOG_CONN_ID, "full connection destroyed");
     free(conn->fc_errmsg);
     free(conn);
@@ -2884,7 +2884,7 @@ generate_stop_waiting_frame (struct full_conn *conn)
 static void
 generate_cctk_frame (struct full_conn *conn)
 {
-    int sz_sz = 1;
+    int sz_sz = vint_size(sizeof(struct cctk_frame));
     LSQ_INFO("------------ generate_cctk_frame---------------------");
     lsquic_packet_out_t *packet_out =
             get_writeable_packet(conn, sizeof(struct cctk_frame) + sz_sz);
@@ -2893,13 +2893,16 @@ generate_cctk_frame (struct full_conn *conn)
 
     int sz = conn->fc_conn.cn_pf->pf_gen_cctk_frame(
             packet_out->po_data + packet_out->po_data_sz + sz_sz,
+            conn->fc_cctk,
             lsquic_packet_out_avail(packet_out)-sz_sz, &conn->fc_send_ctl);
     if (sz < 0) {
         ABORT_ERROR("gen_cctk_frame failed");
         return;
     }
-    *((char *)(packet_out->po_data + packet_out->po_data_sz)) = (char) sz;
-    lsquic_send_ctl_incr_pack_sz(&conn->fc_send_ctl, packet_out, sz + sz_sz);
+    unsigned sz_bits = vint_val2bits(sz);
+    vint_write(packet_out->po_data + packet_out->po_data_sz, sz, sz_bits, 1 << sz_bits);
+    sz += sz_sz;
+    lsquic_send_ctl_incr_pack_sz(&conn->fc_send_ctl, packet_out, sz);
     packet_out->po_frame_types |= 1 << QUIC_FRAME_CCTK;
     LSQ_INFO("wrote CCTK frame: stream id: %"PRIu64,
             conn->fc_max_peer_stream_id);
@@ -3593,8 +3596,8 @@ full_conn_ci_tick (lsquic_conn_t *lconn, lsquic_time_t now)
     {
         if (conn->fc_flags & FC_CCTK)
         {
-            LSQ_INFO("set send CCTK alarm after: %d ms", conn->fc_cctk.init_time);
-            lsquic_alarmset_set(&conn->fc_alset, AL_CCTK, lsquic_time_now() + (conn->fc_cctk.init_time * 1000) );
+            LSQ_INFO("set send CCTK alarm after: %d ms", conn->fc_cctk->init_time);
+            lsquic_alarmset_set(&conn->fc_alset, AL_CCTK, lsquic_time_now() + (conn->fc_cctk->init_time * 1000) );
         }
         // clear want cctk
         conn->fc_pub.lconn->cn_flags &= ~LSCONN_WANT_CCTK;
@@ -3605,8 +3608,8 @@ full_conn_ci_tick (lsquic_conn_t *lconn, lsquic_time_t now)
         if (conn->fc_flags & FC_CCTK)
         {
             generate_cctk_frame(conn);
-            LSQ_DEBUG("set send CCTK alarm after: %d ms", conn->fc_cctk.send_period);
-            lsquic_alarmset_set(&conn->fc_alset, AL_CCTK, lsquic_time_now() + (conn->fc_cctk.send_period * 1000) );
+            LSQ_DEBUG("set send CCTK alarm after: %d ms", conn->fc_cctk->send_period);
+            lsquic_alarmset_set(&conn->fc_alset, AL_CCTK, lsquic_time_now() + (conn->fc_cctk->send_period * 1000) );
             CLOSE_IF_NECESSARY();
         }
         // clear send cctk

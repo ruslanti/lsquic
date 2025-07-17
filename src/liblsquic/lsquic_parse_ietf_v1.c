@@ -2272,8 +2272,7 @@ ietf_v1_gen_datagram_frame (unsigned char *buf, size_t bufsz, size_t min_sz,
 }
 
 static int
-ietf_v1_gen_cctk_frame (unsigned char *buf, size_t bufsz,
-        lsquic_send_ctl_t * send_ctl)
+ietf_v1_gen_cctk_frame (unsigned char *buf, size_t bufsz, struct cctk_ctx *cctk_ctx, lsquic_send_ctl_t * send_ctl)
 {
     unsigned bits, len_sz;
     ssize_t nw;
@@ -2294,7 +2293,7 @@ ietf_v1_gen_cctk_frame (unsigned char *buf, size_t bufsz,
         vint_write(&buf[0], (uint64_t) 0x60, 1, 2);
         vint_write(&buf[2], (uint64_t) tokens_sz, bits, len_sz);
         size_t hz = 2 + len_sz;
-        lsquic_gquic_be_gen_cctk_frame(buf + hz, bufsz - hz, send_ctl);
+        lsquic_gquic_be_gen_cctk_frame(buf + hz, bufsz - hz,  cctk_ctx, send_ctl);
 
         return hz + tokens_sz;
     }

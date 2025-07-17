@@ -536,10 +536,7 @@ struct ietf_full_conn
 #endif
     struct ack_info             ifc_ack;
 
-    struct {
-        unsigned init_time;
-        unsigned send_period;
-    } ifc_cctk;
+    struct cctk_ctx             *ifc_cctk;
 };
 
 #define CUR_CPATH(conn_) (&(conn_)->ifc_paths[(conn_)->ifc_cur_path_id])
@@ -1734,6 +1731,8 @@ lsquic_ietf_full_conn_server_new (struct lsquic_engine_public *enpub,
         ietf_full_conn_ci_packet_in(&conn->ifc_conn, packet_in);
         lsquic_packet_in_put(conn->ifc_pub.mm, packet_in);
     }
+
+    conn->ifc_cctk = calloc(1, sizeof(struct cctk_ctx));
 
     LSQ_DEBUG("logging using %s SCID",
         LSQUIC_LOG_CONN_ID == CN_SCID(&conn->ifc_conn) ? "server" : "client");
@@ -3269,6 +3268,9 @@ ietf_full_conn_ci_destroy (struct lsquic_conn *lconn)
     if (conn->ifc_last_stats)
         free(conn->ifc_last_stats);
 #endif
+
+    if (conn->ifc_cctk)
+        free(conn->ifc_cctk);
     EV_LOG_CONN_EVENT(LSQUIC_LOG_CONN_ID, "full connection destroyed");
     free(conn->ifc_errmsg);
     free(conn);
@@ -3698,8 +3700,10 @@ apply_trans_params (struct ietf_full_conn *conn,
     LSQ_DEBUG("tpi_cc_version: %llu", params->tpi_cc_version);
     if (params->tpi_cc_reuse)
         conn->ifc_flags |= IFC_CCTK;
-    conn->ifc_cctk.init_time = params->tpi_init_time_of_cctk;
-    conn->ifc_cctk.send_period = params->tpi_send_period_of_cctk;
+
+    conn->ifc_cctk->init_time = params->tpi_init_time_of_cctk;
+    conn->ifc_cctk->send_period = params->tpi_send_period_of_cctk;
+    conn->ifc_cctk->net_type = params->tpi_net_type;
 
     conn->ifc_pub.max_peer_ack_usec = params->tp_max_ack_delay * 1000;
 
@@ -8428,8 +8432,9 @@ write_cctk (struct ietf_full_conn *conn)
         return 0;
 
     sz = conn->ifc_conn.cn_pf->pf_gen_cctk_frame(
-            packet_out->po_data + packet_out->po_data_sz ,
-            lsquic_packet_out_avail(packet_out) ,
+            packet_out->po_data + packet_out->po_data_sz + sz_sz,
+            lsquic_packet_out_avail(packet_out) - sz_sz,
+            conn->ifc_cctk,
             &conn->ifc_send_ctl);
 
     if (sz < 0)
@@ -8437,6 +8442,9 @@ write_cctk (struct ietf_full_conn *conn)
         LSQ_DEBUG("could not generate CCTK frame");
         return 0;
     }
+    unsigned sz_bits = vint_val2bits(sz);
+    vint_write(packet_out->po_data + packet_out->po_data_sz, sz, sz_bits, 1 << sz_bits);
+    sz += sz_sz;
     if (0 != lsquic_packet_out_add_frame(packet_out, conn->ifc_pub.mm, 0,
             QUIC_FRAME_CCTK, packet_out->po_data_sz, sz))
     {
