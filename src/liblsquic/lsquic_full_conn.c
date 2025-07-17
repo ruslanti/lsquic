@@ -3585,6 +3585,10 @@ full_conn_ci_tick (lsquic_conn_t *lconn, lsquic_time_t now)
         CLOSE_IF_NECESSARY();
     }
 
+    LSQ_DEBUG("LSCONN_WANT_CCTK: %d", conn->fc_pub.lconn->cn_flags & LSCONN_WANT_CCTK);
+    LSQ_DEBUG("LSCONN_WANT_CCTKFC_CCTK: %d", conn->fc_flags & FC_CCTK);
+    LSQ_DEBUG("FC_SEND_CCTK: %d", conn->fc_flags & FC_SEND_CCTK);
+
     if (conn->fc_pub.lconn->cn_flags & LSCONN_WANT_CCTK)
     {
         if (conn->fc_flags & FC_CCTK)

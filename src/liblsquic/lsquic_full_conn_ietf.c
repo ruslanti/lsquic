@@ -8662,11 +8662,6 @@ ietf_full_conn_ci_tick (struct lsquic_conn *lconn, lsquic_time_t now)
 
     maybe_conn_flush_special_streams(conn);
 
-    s = lsquic_send_ctl_schedule_buffered(&conn->ifc_send_ctl, BPT_HIGHEST_PRIO);
-    conn->ifc_flags |= (s < 0) << IFC_BIT_ERROR;
-    if (!write_is_possible(conn))
-        goto end_write;
-
     if (conn->ifc_pub.lconn->cn_flags & LSCONN_WANT_CCTK)
     {
         if (conn->ifc_flags & IFC_CCTK)
@@ -8674,8 +8669,16 @@ ietf_full_conn_ci_tick (struct lsquic_conn *lconn, lsquic_time_t now)
             LSQ_INFO("set send CCTK alarm after: %d ms", conn->ifc_cctk.init_time);
             lsquic_alarmset_set(&conn->ifc_alset, AL_CCTK, lsquic_time_now() + (conn->ifc_cctk.init_time * 1000) );
         }
+        else
+        {
+            LSQ_DEBUG("IFC_CCTK not set");
+        }
         // clear want cctk
         conn->ifc_pub.lconn->cn_flags &= ~LSCONN_WANT_CCTK;
+    }
+    else
+    {
+        LSQ_DEBUG("LSCONN_WANT_CCTK not set");
     }
 
     if (conn->ifc_send_flags & SF_SEND_CCTK)
@@ -8686,9 +8689,21 @@ ietf_full_conn_ci_tick (struct lsquic_conn *lconn, lsquic_time_t now)
             LSQ_INFO("set send CCTK alarm after: %d ms", conn->ifc_cctk.send_period);
             lsquic_alarmset_set(&conn->ifc_alset, AL_CCTK, lsquic_time_now() + (conn->ifc_cctk.send_period * 1000) );
         }
+        else
+        {
+            LSQ_DEBUG("IFC_CCTK not set");
+        }
         // clear send cctk
         conn->ifc_send_flags &= ~SF_SEND_CCTK;
     }
+    {
+        LSQ_DEBUG("SF_SEND_CCTK not set");
+    }
+
+    s = lsquic_send_ctl_schedule_buffered(&conn->ifc_send_ctl, BPT_HIGHEST_PRIO);
+    conn->ifc_flags |= (s < 0) << IFC_BIT_ERROR;
+    if (!write_is_possible(conn))
+        goto end_write;
 
     while ((conn->ifc_mflags & MF_WANT_DATAGRAM_WRITE) && write_datagram(conn))
         if (!write_is_possible(conn))
