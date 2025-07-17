@@ -8674,8 +8674,8 @@ ietf_full_conn_ci_tick (struct lsquic_conn *lconn, lsquic_time_t now)
     {
         if (conn->ifc_flags & IFC_CCTK)
         {
-            LSQ_INFO("set send CCTK alarm after: %d ms", conn->ifc_cctk.init_time);
-            lsquic_alarmset_set(&conn->ifc_alset, AL_CCTK, lsquic_time_now() + (conn->ifc_cctk.init_time * 1000) );
+            LSQ_INFO("set send CCTK alarm after: %d ms", conn->ifc_cctk->init_time);
+            lsquic_alarmset_set(&conn->ifc_alset, AL_CCTK, lsquic_time_now() + (conn->ifc_cctk->init_time * 1000) );
         }
         else
         {
@@ -8694,8 +8694,8 @@ ietf_full_conn_ci_tick (struct lsquic_conn *lconn, lsquic_time_t now)
         if (conn->ifc_flags & IFC_CCTK)
         {
             write_cctk(conn);
-            LSQ_INFO("set send CCTK alarm after: %d ms", conn->ifc_cctk.send_period);
-            lsquic_alarmset_set(&conn->ifc_alset, AL_CCTK, lsquic_time_now() + (conn->ifc_cctk.send_period * 1000) );
+            LSQ_INFO("set send CCTK alarm after: %d ms", conn->ifc_cctk->send_period);
+            lsquic_alarmset_set(&conn->ifc_alset, AL_CCTK, lsquic_time_now() + (conn->ifc_cctk->send_period * 1000) );
         }
         else
         {

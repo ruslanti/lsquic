@@ -31,6 +31,7 @@
 #include "lsquic_util.h"
 #include "lsquic_conn_flow.h"
 #include "lsquic_sfcw.h"
+#include "lsquic_byteswap.h"
 #include "lsquic_varint.h"
 #include "lsquic_hq.h"
 #include "lsquic_hash.h"
@@ -2893,8 +2894,9 @@ generate_cctk_frame (struct full_conn *conn)
 
     int sz = conn->fc_conn.cn_pf->pf_gen_cctk_frame(
             packet_out->po_data + packet_out->po_data_sz + sz_sz,
+            lsquic_packet_out_avail(packet_out) - sz_sz,
             conn->fc_cctk,
-            lsquic_packet_out_avail(packet_out)-sz_sz, &conn->fc_send_ctl);
+            &conn->fc_send_ctl);
     if (sz < 0) {
         ABORT_ERROR("gen_cctk_frame failed");
         return;
