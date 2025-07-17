@@ -8446,9 +8446,9 @@ write_cctk (struct ietf_full_conn *conn)
         LSQ_DEBUG("could not generate CCTK frame");
         return 0;
     }
-    unsigned sz_bits = vint_val2bits(sz);
-    vint_write(packet_out->po_data + packet_out->po_data_sz, sz, sz_bits, 1 << sz_bits);
-    sz += sz_sz;
+    //unsigned sz_bits = vint_val2bits(sz);
+    //vint_write(packet_out->po_data + packet_out->po_data_sz, sz, sz_bits, 1 << sz_bits);
+    //sz += sz_sz;
     if (0 != lsquic_packet_out_add_frame(packet_out, conn->ifc_pub.mm, 0,
             QUIC_FRAME_CCTK, packet_out->po_data_sz, sz))
     {
