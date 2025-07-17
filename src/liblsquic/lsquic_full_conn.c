@@ -628,6 +628,7 @@ new_conn_common (lsquic_cid_t cid, struct lsquic_engine_public *enpub,
     conn = calloc(1, sizeof(*conn));
     if (!conn)
         return NULL;
+    conn->fc_cctk = calloc(1, sizeof(struct cctk_ctx));
     headers_stream = NULL;
     conn->fc_conn.cn_if = full_conn_iface_ptr;
     conn->fc_conn.cn_cces = conn->fc_cces;
@@ -719,7 +720,6 @@ new_conn_common (lsquic_cid_t cid, struct lsquic_engine_public *enpub,
     conn->fc_conn.cn_n_cces = sizeof(conn->fc_cces) / sizeof(conn->fc_cces[0]);
     if (conn->fc_settings->es_noprogress_timeout)
         conn->fc_flags |= FC_NOPROG_TIMEOUT;
-    conn->fc_cctk = calloc(1, sizeof(struct cctk_ctx));
     return conn;
 
   cleanup_on_error:
