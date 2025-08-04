@@ -648,7 +648,7 @@ lsquic_stream_destroy (lsquic_stream_t *stream)
     if ((stream->conn_pub->cp_flags & CP_PER_CONNECTION_CCTK)==0 && (stream->stream_flags & STREAM_CCTK))
     {
         LSQ_DEBUG("stopping sending CCTK frame");
-        // disble all CCTK flags
+        // disable all CCTK flags
         stream->conn_pub->cp_flags &= ~CP_CCTK_ENABLE;
     }
 
