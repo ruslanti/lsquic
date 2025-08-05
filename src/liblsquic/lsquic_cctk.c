@@ -223,8 +223,8 @@ lsquic_write_cctk_frame_payload (unsigned char *buf, size_t buf_len, struct cctk
     // SLST - slow start
     if (cubic)
         cctk.slst = (cubic->cu_cwnd < cubic->cu_ssthresh) ? 1 : 0;
-    else
-        cctk.slst = (bbr->bbr_mode == BBR_MODE_STARTUP) ? 1 : 0;
+    if (bbr)
+        cctk.slst = (bbr->bbr_mode == BBR_MODE_STARTUP) ? cctk.slst : 0;
         
 
     // NTYP - network type
@@ -273,7 +273,8 @@ lsquic_write_cctk_frame_payload (unsigned char *buf, size_t buf_len, struct cctk
     }
 
     // BLEN - buffer length in connection level
-    cctk.blen = lsquic_conn_buffered_sum(conn_pub);
+    //cctk.blen = lsquic_conn_buffered_sum(conn_pub);
+    cctk.blen = send_ctl->sc_n_scheduled;
     
     #if LSQUIC_CONN_STATS
     const struct conn_stats *conn_stats = conn_pub->conn_stats;
