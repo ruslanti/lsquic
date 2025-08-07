@@ -186,6 +186,18 @@ lsquic_cctk_frame_size(const struct cctk_ctx *cctk_ctx)
 }
 
 int
+buffer_avg(unsigned long input, int drain, int dt)
+{
+    double linear_factor = ((double)input / drain) / dt;
+    if (linear_factor < 1.0) {
+        return (int)(linear_factor * input/2);
+    } else {
+        unsigned long rest = input - dt * drain;
+        return rest + (input - rest) / 2;
+    }
+}
+
+int
 lsquic_write_cctk_frame_payload (unsigned char *buf, size_t buf_len, struct cctk_ctx *cctk_ctx, lsquic_send_ctl_t * send_ctl)
 {
     size_t cctk_size = lsquic_cctk_frame_size(cctk_ctx);
@@ -222,7 +234,8 @@ lsquic_write_cctk_frame_payload (unsigned char *buf, size_t buf_len, struct cctk
     
     // SLST - slow start
     if (cubic)
-        cctk.slst = (cubic->cu_cwnd < cubic->cu_ssthresh) ? 1 : 0;
+        cctk.slst = (cubic->cu_cwnd < cubic->cu_ssthresh / 2) ? 1 : 0;
+        //cctk.slst = (cubic->cu_cwnd < cubic->cu_ssthresh) ? 1 : 0;
     if (bbr)
         cctk.slst = (bbr->bbr_mode == BBR_MODE_STARTUP) ? cctk.slst : 0;
         
@@ -274,7 +287,7 @@ lsquic_write_cctk_frame_payload (unsigned char *buf, size_t buf_len, struct cctk
 
     // BLEN - buffer length in connection level
     //cctk.blen = lsquic_conn_buffered_sum(conn_pub);
-    cctk.blen = send_ctl->sc_n_scheduled;
+
     
     #if LSQUIC_CONN_STATS
     const struct conn_stats *conn_stats = conn_pub->conn_stats;
@@ -291,6 +304,7 @@ lsquic_write_cctk_frame_payload (unsigned char *buf, size_t buf_len, struct cctk
         written_total = lsquic_conn_written_sum(conn_pub);
         unsigned long written_diff = written_total - cctk_ctx->last_written;
         cctk.irat = 1000000 * written_diff / time_diff;
+        cctk.blen = buffer_avg(written_diff, (float)cctk.bw, time_diff/ 1000000);
     }
     
     cctk_ctx->last_bytes_acked = conn_stats->out.bytes - in_flight;
