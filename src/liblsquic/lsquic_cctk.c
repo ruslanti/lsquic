@@ -123,7 +123,10 @@ void * get_cc_ctx(char cc_type, lsquic_send_ctl_t *send_ctl) {
             return NULL;
     case CC_ALG_ADAPTIVE:
     default:
-        return &send_ctl->sc_adaptive_cc;
+        if(enpub->enp_settings.es_cc_algo == CC_ALG_ADAPTIVE)
+            return &send_ctl->sc_adaptive_cc;
+        else
+            return NULL;
     }
     return NULL;
 }
@@ -231,14 +234,19 @@ lsquic_write_cctk_frame_payload (unsigned char *buf, size_t buf_len, struct cctk
 
     struct lsquic_bbr *bbr = get_cc_ctx(CC_ALG_BBR, send_ctl);
     struct lsquic_cubic *cubic = get_cc_ctx(CC_ALG_CUBIC, send_ctl);
+    struct adaptive_cc *acc = get_cc_ctx(CC_ALG_ADAPTIVE, send_ctl);
     
     // SLST - slow start
-    if (cubic)
-        cctk.slst = (cubic->cu_cwnd < cubic->cu_ssthresh / 2) ? 1 : 0;
-        //cctk.slst = (cubic->cu_cwnd < cubic->cu_ssthresh) ? 1 : 0;
-    if (bbr)
-        cctk.slst = (bbr->bbr_mode == BBR_MODE_STARTUP) ? cctk.slst : 0;
-        
+    if (acc) {
+        if (acc->acc_flags & ACC_CUBIC)
+            cctk.slst = (cubic->cu_cwnd < cubic->cu_ssthresh) ? 1 : 0;
+        else
+            cctk.slst = (bbr->bbr_mode == BBR_MODE_STARTUP) ? 1 : 0;
+    } else if (cubic) {
+        cctk.slst = (cubic->cu_cwnd < cubic->cu_ssthresh) ? 1 : 0;
+    } else if (bbr) {
+        cctk.slst = (bbr->bbr_mode == BBR_MODE_STARTUP) ? 1 : 0;
+    }
 
     // NTYP - network type
     cctk.ntyp = cctk_ctx->net_type;
